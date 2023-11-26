@@ -168,6 +168,21 @@ export class ProductController {
     description: 'Product DELETE success',
   })
   async deleteById(@param.path.string('id') id: string): Promise<void> {
+    const product = await this.productRepository.findById(id);
+    if (!product) {
+      throw new HttpErrors.NotFound(`Product with id ${id} not found.`);
+    }
+
+    // Delete related product thumbnail file as well
+    if (product.thumbnail) {
+      const filePath = path.join(publicDir, product.thumbnail)
+      try {
+        await unlinkAsync(filePath)
+      } catch (e) {
+        console.log(`Error while deleting file ${filePath}`, e)
+      }
+    }
+
     await this.productRepository.deleteById(id);
   }
 
