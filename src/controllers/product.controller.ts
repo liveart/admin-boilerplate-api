@@ -35,6 +35,7 @@ const unlinkAsync = promisify(unlink);
 
 const MAX_FILE_SIZE_MB = 1;
 const MAX_FILE_SIZE = MAX_FILE_SIZE_MB * 1024 * 1024;
+const THUMBNAIL_SIZE = 100;
 
 const fileDirOnServer = 'uploads/product-thumbnails';
 const publicDir = path.join(__dirname, '../../public');
@@ -265,8 +266,9 @@ export class ProductController {
     const filePath = path.join(uploadThumbnailDirPath, fileName)
     const fileUrl = path.join(fileDirOnServer, fileName)
 
+    // Resize the image to 100x100
     const imageResizedBuffer = await sharp(files[0].buffer)
-      .resize(100, 100)
+      .resize(THUMBNAIL_SIZE, THUMBNAIL_SIZE)
       .toBuffer();
     await writeFileAsync(filePath, imageResizedBuffer);
 
