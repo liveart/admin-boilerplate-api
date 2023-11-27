@@ -212,11 +212,11 @@ export class ProductController {
       throw new HttpErrors.InternalServerError(err.toString());
     }
 
+
+    // File validation
     if (!file) {
       throw new HttpErrors.BadRequest('Invalid file data, or no file provided');
     }
-
-    // File validation
     if (file.mimetype !== 'image/jpeg' && file.mimetype !== 'image/png') {
       throw new HttpErrors.BadRequest('Only JPG and PNG files are allowed');
     }
