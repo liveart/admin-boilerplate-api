@@ -27,23 +27,23 @@ import {
 } from 'express-serve-static-core';
 import {Product} from '../models';
 import {ProductRepository} from '../repositories';
-import {FILE_UPLOAD_SERVICE, REQ_FILES_HANDLER_SERVICE} from '../keys';
+import {FILE_UPLOAD_SERVICE, REQ_FILES_EXTRACTOR_SERVICE} from '../keys';
 import {FileUploadProvider} from '../services/file-upload.service';
-import {ReqFilesHandler} from '../services/req-file-extractor.service';
+import {ReqFilesExtractor} from '../services/req-file-extractor.service';
 
 const MAX_FILE_SIZE_MB = 1;
-const MAX_FILE_SIZE = MAX_FILE_SIZE_MB * 1024 * 1024;
-const THUMBNAIL_SIZE = 100;
+const MAX_FILE_SIZE_BYTE = MAX_FILE_SIZE_MB * 1024 * 1024;
+const THUMBNAIL_SIZE_PX = 100;
 
-const fileDirOnServer = 'uploads/product-thumbnails';
-const publicDir = path.join(__dirname, '../../public');
-const uploadThumbnailDirPath = path.join(publicDir, fileDirOnServer);
+const UPLOADED_THUMBNAILS_PATHNAME = 'uploads/product-thumbnails';
+const PUBLIC_DIR = path.join(__dirname, '../../public');
+const UPLOADED_THUMBNAILS_DIR = path.join(PUBLIC_DIR, UPLOADED_THUMBNAILS_PATHNAME);
 
 const makeThumbnailFilename = (id: string) => `${id}_thumbnail_${Date.now()}.jpg`
 
 export class ProductController {
   constructor(
-    @inject(REQ_FILES_HANDLER_SERVICE) private requestFileExtractor: ReqFilesHandler,
+    @inject(REQ_FILES_EXTRACTOR_SERVICE) private requestFileExtractor: ReqFilesExtractor,
     @inject(FILE_UPLOAD_SERVICE) private fileUpload: FileUploadProvider,
     @repository(ProductRepository)
     public productRepository : ProductRepository,
@@ -168,14 +168,15 @@ export class ProductController {
     description: 'Product DELETE success',
   })
   async deleteById(@param.path.string('id') id: string): Promise<void> {
+    // Ensure that the product with the given id exists
     const product = await this.productRepository.findById(id);
     if (!product) {
       throw new HttpErrors.NotFound(`Product with id ${id} not found.`);
     }
 
-    // Delete related product thumbnail file as well
+    // Delete thumbnail file of the product if exists
     if (product.thumbnail) {
-      const filePath = path.join(publicDir, product.thumbnail)
+      const filePath = path.join(PUBLIC_DIR, product.thumbnail)
       try {
         await this.fileUpload.deleteFile(filePath)
       } catch (e) {
@@ -220,14 +221,14 @@ export class ProductController {
     if (file.mimetype !== 'image/jpeg' && file.mimetype !== 'image/png') {
       throw new HttpErrors.BadRequest('Only JPG and PNG files are allowed');
     }
-    if (file.size > MAX_FILE_SIZE) {
+    if (file.size > MAX_FILE_SIZE_BYTE) {
       throw new HttpErrors.BadRequest(`File size should not exceed ${MAX_FILE_SIZE_MB}MB`);
     }
 
 
     // Delete the previous thumbnail file if exists
     if (product.thumbnail) {
-      const filePath = path.join(publicDir, product.thumbnail)
+      const filePath = path.join(PUBLIC_DIR, product.thumbnail)
       try {
         await this.fileUpload.deleteFile(filePath)
       } catch (e) {
@@ -238,17 +239,17 @@ export class ProductController {
 
     // Save the file to the local file system
     const fileName = makeThumbnailFilename(id)
-    const filePath = path.join(uploadThumbnailDirPath, fileName)
+    const filePath = path.join(UPLOADED_THUMBNAILS_DIR, fileName)
 
     // Resize the image to 100x100
     const imageResizedBuffer = await sharp(file.buffer)
-      .resize(THUMBNAIL_SIZE, THUMBNAIL_SIZE)
+      .resize(THUMBNAIL_SIZE_PX, THUMBNAIL_SIZE_PX)
       .toBuffer();
     await this.fileUpload.uploadFile(filePath, imageResizedBuffer)
 
 
     // Update the product with the new thumbnail
-    const fileUrl = path.join(fileDirOnServer, fileName)
+    const fileUrl = path.join(UPLOADED_THUMBNAILS_PATHNAME, fileName)
     product.thumbnail = fileUrl;
     await this.productRepository.update(product);
 
@@ -274,8 +275,8 @@ export class ProductController {
       return;
     }
 
-    // Delete the file from the local file system
-    const filePath = path.join(uploadThumbnailDirPath, product.thumbnail);
+    // Delete the thumbnail file
+    const filePath = path.join(UPLOADED_THUMBNAILS_DIR, product.thumbnail);
     try {
       await this.fileUpload.deleteFile(filePath)
     } catch (e) {

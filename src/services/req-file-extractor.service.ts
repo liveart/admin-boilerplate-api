@@ -5,16 +5,16 @@ import {
   Provider,
 } from '@loopback/core';
 import multer from 'multer';
-import {REQ_FILES_HANDLER_SERVICE} from '../keys';
+import {REQ_FILES_EXTRACTOR_SERVICE} from '../keys';
 import {Request, Response} from 'express-serve-static-core';
 
-export type ReqFilesHandler = (req: Request, res: Response) => Promise<Express.Multer.File[]>;
+export type ReqFilesExtractor = (req: Request, res: Response) => Promise<Express.Multer.File[]>;
 
 @injectable({
   scope: BindingScope.TRANSIENT,
-  tags: {[ContextTags.KEY]: REQ_FILES_HANDLER_SERVICE},
+  tags: {[ContextTags.KEY]: REQ_FILES_EXTRACTOR_SERVICE},
 })
-export class ReqFilesHandlerProvider implements Provider<ReqFilesHandler> {
+export class ReqFilesExtractorProvider implements Provider<ReqFilesExtractor> {
   async #extractFormDataFilesToFilesProperty(req: Request, res: Response): Promise<void> {
     await new Promise<void>((resolve, reject) => {
       // @ts-ignore
@@ -28,7 +28,7 @@ export class ReqFilesHandlerProvider implements Provider<ReqFilesHandler> {
     });
   }
 
-  async getReqFiles(req: Request, res: Response): Promise<Express.Multer.File[]> {
+  async extractReqFiles(req: Request, res: Response): Promise<Express.Multer.File[]> {
     await this.#extractFormDataFilesToFilesProperty(req, res);
 
     const files: Express.Multer.File[] = []
@@ -45,7 +45,7 @@ export class ReqFilesHandlerProvider implements Provider<ReqFilesHandler> {
     return files;
   }
 
-  value(): ReqFilesHandler {
-    return this.getReqFiles.bind(this)
+  value(): ReqFilesExtractor {
+    return this.extractReqFiles.bind(this)
   }
 }
