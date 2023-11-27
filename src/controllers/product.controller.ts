@@ -25,8 +25,8 @@ import {inject} from '@loopback/core';
 import sharp from 'sharp';
 import {Product} from '../models';
 import {ProductRepository} from '../repositories';
-import {FILE_UPLOAD_SERVICE} from '../keys';
-import {FileUploadHandler} from '../types';
+import {MULTER_REQUEST_HANDLER_SERVICE} from '../keys';
+import {MulterRequestHandler} from '../types';
 
 const writeFileAsync = promisify(writeFile);
 const existsAsync = promisify(exists);
@@ -44,7 +44,7 @@ const makeThumbnailFilename = (id: string) => `${id}_thumbnail_${Date.now()}.jpg
 
 export class ProductController {
   constructor(
-    @inject(FILE_UPLOAD_SERVICE) private handler: FileUploadHandler,
+    @inject(MULTER_REQUEST_HANDLER_SERVICE) private multerHandler: MulterRequestHandler,
     @repository(ProductRepository)
     public productRepository : ProductRepository,
   ) {}
@@ -207,7 +207,7 @@ export class ProductController {
     try {
       await new Promise<void>((resolve, reject) => {
         // @ts-ignore
-        this.handler(req, res, (err: unknown) => {
+        this.multerHandler(req, res, (err: unknown) => {
           if (err) reject(err);
           resolve();
         })

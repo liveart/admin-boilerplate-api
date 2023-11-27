@@ -1,9 +1,6 @@
 import {BindingKey} from '@loopback/core';
-import {FileUploadHandler} from './types';
+import {MulterRequestHandler} from './types';
 
-/**
- * Binding key for the file upload service
- */
-export const FILE_UPLOAD_SERVICE = BindingKey.create<FileUploadHandler>(
+export const MULTER_REQUEST_HANDLER_SERVICE = BindingKey.create<MulterRequestHandler>(
   'services.FileUpload',
 );

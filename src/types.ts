@@ -1,3 +1,3 @@
 import {RequestHandler} from 'express-serve-static-core';
 
-export type FileUploadHandler = RequestHandler;
+export type MulterRequestHandler = RequestHandler;
