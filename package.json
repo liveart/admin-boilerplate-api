@@ -32,7 +32,11 @@
     "prestart": "npm run rebuild",
     "start": "node -r source-map-support/register .",
     "clean": "lb-clean dist *.tsbuildinfo .eslintcache",
-    "rebuild": "npm run clean && npm run build"
+    "rebuild": "npm run clean && npm run build",
+    "migrate-up": "migrate-mongo up",
+    "migrate-create": "migrate-mongo create",
+    "migrate-down": "migrate-mongo down",
+    "migrate-status": "migrate-mongo status"
   },
   "repository": {
     "type": "git",
@@ -63,6 +67,7 @@
     "@loopback/testlab": "^6.0.0",
     "@types/node": "^14.18.47",
     "eslint": "^8.40.0",
+    "migrate-mongo": "^11.0.0",
     "source-map-support": "^0.5.21",
     "typescript": "~4.9.5"
   }
