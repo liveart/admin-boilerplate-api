@@ -202,12 +202,18 @@ export class ProductController {
       throw new HttpErrors.NotFound(`Product with id ${id} not found.`);
     }
 
+
+    // Extract the file from the request
     let file;
     try {
       const files = await this.requestFileExtractor(req as ExpressServeStaticCoreRequest, res as ExpressServeStaticCoreResponse)
       file = files[0]
     } catch (err) {
       throw new HttpErrors.InternalServerError(err.toString());
+    }
+
+    if (!file) {
+      throw new HttpErrors.BadRequest('Invalid file data, or no file provided');
     }
 
     // File validation
@@ -233,7 +239,6 @@ export class ProductController {
     // Save the file to the local file system
     const fileName = makeThumbnailFilename(id)
     const filePath = path.join(uploadThumbnailDirPath, fileName)
-    const fileUrl = path.join(fileDirOnServer, fileName)
 
     // Resize the image to 100x100
     const imageResizedBuffer = await sharp(file.buffer)
@@ -241,7 +246,9 @@ export class ProductController {
       .toBuffer();
     await this.fileUpload.uploadFile(filePath, imageResizedBuffer)
 
+
     // Update the product with the new thumbnail
+    const fileUrl = path.join(fileDirOnServer, fileName)
     product.thumbnail = fileUrl;
     await this.productRepository.update(product);
 
