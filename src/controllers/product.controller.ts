@@ -1,5 +1,3 @@
-import { exists, mkdir, writeFile, unlink } from 'fs';
-import { promisify } from 'util';
 import path from 'path';
 import {
   Count,
@@ -23,15 +21,15 @@ import {
 } from '@loopback/rest';
 import {inject} from '@loopback/core';
 import sharp from 'sharp';
+import {
+  Request as ExpressServeStaticCoreRequest,
+  Response as ExpressServeStaticCoreResponse,
+} from 'express-serve-static-core';
 import {Product} from '../models';
 import {ProductRepository} from '../repositories';
-import {MULTER_REQUEST_HANDLER_SERVICE} from '../keys';
-import {MulterRequestHandler} from '../types';
-
-const writeFileAsync = promisify(writeFile);
-const existsAsync = promisify(exists);
-const mkDirAsync = promisify(mkdir);
-const unlinkAsync = promisify(unlink);
+import {FILE_UPLOAD_SERVICE, REQ_FILES_HANDLER_SERVICE} from '../keys';
+import {FileUploadProvider} from '../services/file-upload.service';
+import {ReqFilesHandler} from '../services/req-file-extractor.service';
 
 const MAX_FILE_SIZE_MB = 1;
 const MAX_FILE_SIZE = MAX_FILE_SIZE_MB * 1024 * 1024;
@@ -45,7 +43,8 @@ const makeThumbnailFilename = (id: string) => `${id}_thumbnail_${Date.now()}.jpg
 
 export class ProductController {
   constructor(
-    @inject(MULTER_REQUEST_HANDLER_SERVICE) private multerHandler: MulterRequestHandler,
+    @inject(REQ_FILES_HANDLER_SERVICE) private requestFileExtractor: ReqFilesHandler,
+    @inject(FILE_UPLOAD_SERVICE) private fileUpload: FileUploadProvider,
     @repository(ProductRepository)
     public productRepository : ProductRepository,
   ) {}
@@ -178,7 +177,7 @@ export class ProductController {
     if (product.thumbnail) {
       const filePath = path.join(publicDir, product.thumbnail)
       try {
-        await unlinkAsync(filePath)
+        await this.fileUpload.deleteFile(filePath)
       } catch (e) {
         console.log(`Error while deleting file ${filePath}`, e)
       }
@@ -203,37 +202,13 @@ export class ProductController {
       throw new HttpErrors.NotFound(`Product with id ${id} not found.`);
     }
 
-
-    // Enrich the request with the files body
+    let file;
     try {
-      await new Promise<void>((resolve, reject) => {
-        // @ts-ignore
-        this.multerHandler(req, res, (err: unknown) => {
-          if (err) reject(err);
-          resolve();
-        })
-      });
+      const files = await this.requestFileExtractor(req as ExpressServeStaticCoreRequest, res as ExpressServeStaticCoreResponse)
+      file = files[0]
     } catch (err) {
       throw new HttpErrors.InternalServerError(err.toString());
     }
-
-
-    // Define file from the request body
-    // @ts-ignore
-    const uploadedFiles = req.files;
-    const files: Express.Multer.File[] = []
-    if (Array.isArray(uploadedFiles)) {
-      files.push(...uploadedFiles);
-    } else {
-      for (const filename in uploadedFiles) {
-        files.push(uploadedFiles[filename]);
-      }
-    }
-    if (!files.length) {
-      throw new HttpErrors.BadRequest('Invalid file data');
-    }
-    const file = files[0];
-
 
     // File validation
     if (file.mimetype !== 'image/jpeg' && file.mimetype !== 'image/png') {
@@ -244,17 +219,11 @@ export class ProductController {
     }
 
 
-    // Create the upload directory if not exists
-    if (!(await existsAsync(uploadThumbnailDirPath))){
-      await mkDirAsync(uploadThumbnailDirPath, { recursive: true });
-    }
-
-
     // Delete the previous thumbnail file if exists
     if (product.thumbnail) {
       const filePath = path.join(publicDir, product.thumbnail)
       try {
-        await unlinkAsync(filePath)
+        await this.fileUpload.deleteFile(filePath)
       } catch (e) {
         console.log(`Error while deleting previous thumbnail file ${filePath}`, e)
       }
@@ -267,11 +236,10 @@ export class ProductController {
     const fileUrl = path.join(fileDirOnServer, fileName)
 
     // Resize the image to 100x100
-    const imageResizedBuffer = await sharp(files[0].buffer)
+    const imageResizedBuffer = await sharp(file.buffer)
       .resize(THUMBNAIL_SIZE, THUMBNAIL_SIZE)
       .toBuffer();
-    await writeFileAsync(filePath, imageResizedBuffer);
-
+    await this.fileUpload.uploadFile(filePath, imageResizedBuffer)
 
     // Update the product with the new thumbnail
     product.thumbnail = fileUrl;
@@ -294,25 +262,21 @@ export class ProductController {
       throw new HttpErrors.NotFound(`Product with id ${id} not found.`);
     }
 
-
     // Check if the product has a thumbnail to delete
     if (!product.thumbnail) {
       return;
     }
 
-
     // Delete the file from the local file system
     const filePath = path.join(uploadThumbnailDirPath, product.thumbnail);
     try {
-      await unlinkAsync(filePath);
+      await this.fileUpload.deleteFile(filePath)
     } catch (e) {
       console.log(`Error while deleting file ${filePath}`, e)
     }
 
-
     // Clear the previewUrl property of the product
     product.thumbnail = '';
-
 
     // Update the product in the database
     await this.productRepository.update(product);
